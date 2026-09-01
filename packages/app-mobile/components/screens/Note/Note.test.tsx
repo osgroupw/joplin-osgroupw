@@ -158,7 +158,7 @@ const setupNoteWithPanes = async (panes: string[], noteTitle = 'Test note') => {
 	return renderResult;
 };
 
-describe('screens/Note', () => {
+describe('screens/Note/Note', () => {
 	beforeEach(async () => {
 		await setupDatabaseAndSynchronizer(1);
 		await setupDatabaseAndSynchronizer(0);
@@ -219,6 +219,24 @@ describe('screens/Note', () => {
 		});
 
 		unmount();
+	});
+
+	it('should discard a queued save when the reload time has moved on', async () => {
+		const noteId = await openNewNote({ title: 'Original title', body: 'Body' });
+		const { unmount } = render(<WrappedNoteScreen />);
+		const titleInput = await screen.findByDisplayValue('Original title');
+
+		await act(async () => {
+			fireEvent.changeText(titleInput, 'Stale local title');
+			const remotelyUpdatedNote = await Note.load(noteId);
+			remotelyUpdatedNote.title = 'Remote title';
+			await Note.save(remotelyUpdatedNote);
+			store.dispatch({ type: 'EDITOR_NOTE_NEEDS_RELOAD', noteId });
+		});
+
+		await waitForNoteToMatch(noteId, { title: 'Remote title' });
+		unmount();
+		await waitForNoteToMatch(noteId, { title: 'Remote title' });
 	});
 
 	it('changing the note body in the editor should update the note\'s body', async () => {
