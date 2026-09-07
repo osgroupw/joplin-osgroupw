@@ -1,0 +1,12 @@
+.search-not-found-banner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 0;
+
+	> .close {
+		cursor: pointer;
+		color: var(--joplin-color-faded);
+		margin-left: 10px;
+	}
+}

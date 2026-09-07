@@ -5,6 +5,7 @@ import getSearchState from '../utils/getSearchState';
 import { EditorEventType } from '../../events';
 import { search, searchPanelOpen, SearchQuery, setSearchQuery } from '@codemirror/search';
 import announceSearchMatch from '../vendor/announceSearchMatch';
+import noMatchFoundField, { setNoMatchFound } from '../utils/noMatchFoundState';
 
 type CancelEvent = { cancelled: boolean };
 
@@ -77,7 +78,7 @@ const autoScrollToMatchPlugin = ViewPlugin.fromClass(class {
 		startState: EditorState,
 		cancelEvent: CancelEvent,
 	) {
-		const isOpenSearchPanelEvent = () => searchPanelOpen(startState) && !searchPanelOpen(state);
+		const isOpenSearchPanelEvent = () => !searchPanelOpen(startState) && searchPanelOpen(state);
 		if (
 			!query || query.search.length === 0
 			// Avoid auto-scrolling to the search result when first opening the search panel
@@ -100,7 +101,9 @@ const autoScrollToMatchPlugin = ViewPlugin.fromClass(class {
 		const firstMatchAfterSelection = await getFirstMatchAfter(searchStart);
 		const targetMatch = firstMatchAfterSelection ?? await getFirstMatchAfter(0);
 
-		if (targetMatch && targetMatch.from >= 0 && !cancelEvent.cancelled) {
+		if (cancelEvent.cancelled) return;
+
+		if (targetMatch && targetMatch.from >= 0) {
 			this._view.dispatch({
 				selection: EditorSelection.single(targetMatch.from, targetMatch.to),
 				effects: [
@@ -110,8 +113,13 @@ const autoScrollToMatchPlugin = ViewPlugin.fromClass(class {
 
 					EditorView.scrollIntoView(targetMatch.from),
 					announceSearchMatch(state, targetMatch),
+					setNoMatchFound.of(false),
 				],
 				userEvent: 'select.search',
+			});
+		} else {
+			this._view.dispatch({
+				effects: [setNoMatchFound.of(true)],
 			});
 		}
 	}
@@ -175,9 +183,11 @@ const searchExtension = (onEvent: OnEventCallback, settings: EditorSettings): Ex
 		} : undefined),
 
 		autoScrollToMatchPlugin,
+		noMatchFoundField,
 
 		EditorState.transactionExtender.of((tr) => {
-			if (tr.effects.some(e => e.is(setSearchQuery)) || searchPanelOpen(tr.state) !== searchPanelOpen(tr.startState)) {
+			const noMatchFoundChanged = tr.effects.some(e => e.is(setNoMatchFound));
+			if (noMatchFoundChanged || tr.effects.some(e => e.is(setSearchQuery)) || searchPanelOpen(tr.state) !== searchPanelOpen(tr.startState)) {
 				const changeSourceEffects = tr.effects.filter(effect => effect.is(searchChangeSourceEffect));
 				const changeSources = changeSourceEffects.map(effect => effect.value);
 

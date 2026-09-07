@@ -262,6 +262,10 @@ export interface SearchState {
 	searchText: string;
 	replaceText: string;
 	dialogVisible: boolean;
+
+	// True if a search for [searchText] has completed and found no matches.
+	// Only supported by the CodeMirror editor.
+	noMatchFound?: boolean;
 }
 
 // Possible types of lists in the editor

@@ -34,6 +34,7 @@ import eventManager, { EventName, ResourceChangeEvent } from '@joplin/lib/eventM
 import useSyncEditorValue from './utils/useSyncEditorValue';
 import { getGlobalSettings } from '@joplin/renderer/types';
 import useEditorSettings from './utils/useEditorSettings';
+import SearchNotFoundBanner from './SearchNotFoundBanner';
 
 const logger = Logger.create('CodeMirror6');
 const logDebug = (message: string) => logger.debug(message);
@@ -297,6 +298,14 @@ const CodeMirror = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBodyEditor
 
 	useRefocusOnVisiblePaneChange({ editorRef, webviewRef, visiblePanes: props.visiblePanes });
 
+	// Stop media playing in the viewer once it's hidden - https://github.com/laurent22/joplin/issues/15278
+	const viewerVisible = props.visiblePanes.includes('viewer');
+	useEffect(() => {
+		if (!viewerVisible) {
+			webviewRef.current?.stopMediaPlayback();
+		}
+	}, [viewerVisible]);
+
 	useEditorSearchHandler({
 		setLocalSearchResultCount: props.setLocalSearchResultCount,
 		searchMarkers: props.searchMarkers,
@@ -317,6 +326,8 @@ const CodeMirror = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBodyEditor
 	});
 
 	const lastSearchState = useRef<SearchState|null>(null);
+	const [searchState, setSearchState] = useState<SearchState|null>(null);
+	const [searchNotFoundDismissed, setSearchNotFoundDismissed] = useState(false);
 	const onEditorEvent = useCallback((event: EditorEvent) => {
 		if (event.kind === EditorEventType.Scroll) {
 			editor_scroll();
@@ -328,16 +339,25 @@ const CodeMirror = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBodyEditor
 		} else if (event.kind === EditorEventType.UpdateSearchDialog) {
 			if (lastSearchState.current?.searchText !== event.searchState.searchText) {
 				props.setLocalSearch(event.searchState.searchText);
+				setSearchNotFoundDismissed(false);
 			}
 
 			if (lastSearchState.current?.dialogVisible !== event.searchState.dialogVisible) {
 				props.setShowLocalSearch(event.searchState.dialogVisible);
 			}
 			lastSearchState.current = event.searchState;
+			setSearchState(event.searchState);
 		} else if (event.kind === EditorEventType.FollowLink) {
 			void CommandService.instance().execute('openItem', event.link);
 		}
 	}, [editor_scroll, codeMirror_change, props.setLocalSearch, props.setShowLocalSearch, props.onCursorMotion]);
+
+	const showSearchNotFoundBanner = (
+		!!searchState?.dialogVisible && !!searchState?.noMatchFound && !!searchState?.searchText && !searchNotFoundDismissed
+	);
+	const onSearchNotFoundBannerClose = useCallback(() => {
+		setSearchNotFoundDismissed(true);
+	}, []);
 
 	const onSelectPastBeginning = useCallback(() => {
 		void CommandService.instance().execute('focusElement', 'noteTitle');
@@ -421,6 +441,7 @@ const CodeMirror = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBodyEditor
 					<Toolbar themeId={props.themeId} windowId={windowId}/>
 					{props.noteToolbar}
 				</div>
+				{showSearchNotFoundBanner && <SearchNotFoundBanner searchText={searchState.searchText} onClose={onSearchNotFoundBannerClose}/>}
 				{editorViewerRow}
 			</div>
 		</ErrorBoundary>

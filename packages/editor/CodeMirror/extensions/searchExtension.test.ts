@@ -5,6 +5,7 @@ import { EditorView } from '@codemirror/view';
 import searchExtension from './searchExtension';
 import createEditorSettings from '../../testing/createEditorSettings';
 import { Second } from '@joplin/utils/time';
+import getSearchState from '../utils/getSearchState';
 
 const setSearchText = (text: string, view: EditorView) => {
 	const oldQuery = getSearchQuery(view.state);
@@ -95,5 +96,15 @@ describe('searchExtension', () => {
 
 		await setSearchTextAndWait('Before', view);
 		expect(getSelectionFrom(view)).toBe(0);
+	});
+
+	test('should indicate when a search has no matches', async () => {
+		const view = await createEditor('Line 1\nLine 2', 0);
+
+		await setSearchTextAndWait('Line 3', view);
+		expect(getSearchState(view.state).noMatchFound).toBe(true);
+
+		await setSearchTextAndWait('Line 1', view);
+		expect(getSearchState(view.state).noMatchFound).toBe(false);
 	});
 });
