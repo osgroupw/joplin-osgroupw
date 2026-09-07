@@ -29,9 +29,10 @@ const GroupNode = ({ data, selected, id }: NodeProps<{ id: string; type: 'wbGrou
 	}, [editing]);
 
 	const beginEdit = useCallback(() => {
+		if (ctx.readOnly) return;
 		setDraft(label);
 		setEditing(true);
-	}, [label]);
+	}, [ctx.readOnly, label]);
 
 	const commit = useCallback(() => {
 		if (!editing) return;
@@ -61,7 +62,7 @@ const GroupNode = ({ data, selected, id }: NodeProps<{ id: string; type: 'wbGrou
 	const edgeStyle = colorStroke ? { borderColor: colorStroke } : undefined;
 	return (
 		<>
-			<NodeResizer minWidth={80} minHeight={60} isVisible={selected && !editing} />
+			<NodeResizer minWidth={80} minHeight={60} isVisible={selected && !editing && !ctx.readOnly} />
 			<div className={`whiteboard-group ${selected ? '-selected' : ''}`}>
 				<div className="background" style={colorFill ? { background: colorFill } : undefined} />
 				<div className="edge -top whiteboard-group-handle" style={edgeStyle} />

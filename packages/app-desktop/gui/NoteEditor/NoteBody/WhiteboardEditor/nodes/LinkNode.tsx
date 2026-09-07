@@ -21,7 +21,7 @@ const LinkNode = ({ data, selected }: NodeProps<{ id: string; type: 'wbLink'; da
 
 	return (
 		<>
-			<NodeResizer minWidth={80} minHeight={40} isVisible={!!selected} />
+			<NodeResizer minWidth={80} minHeight={40} isVisible={!!selected && !ctx.readOnly} />
 			{handlePositions.map(({ id: hid, position }) => (
 				<Handle key={hid} type="source" position={position} id={hid} />
 			))}

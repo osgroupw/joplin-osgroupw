@@ -61,9 +61,10 @@ const TextNode = ({ data, selected, id }: NodeProps<{ id: string; type: 'wbText'
 	const html = useRenderedMarkdown(node.text, ctx);
 
 	const beginEdit = useCallback(() => {
+		if (ctx.readOnly) return;
 		setDraft(node.text);
 		setEditing(true);
-	}, [node.text]);
+	}, [ctx.readOnly, node.text]);
 
 	const commit = useCallback(() => {
 		if (!editing) return;
@@ -112,7 +113,7 @@ const TextNode = ({ data, selected, id }: NodeProps<{ id: string; type: 'wbText'
 
 	return (
 		<>
-			<NodeResizer minWidth={80} minHeight={40} isVisible={selected && !editing} />
+			<NodeResizer minWidth={80} minHeight={40} isVisible={selected && !editing && !ctx.readOnly} />
 			{handlePositions.map(({ id: hid, position }) => (
 				<Handle key={hid} type="source" position={position} id={hid} />
 			))}
@@ -141,7 +142,7 @@ const TextNode = ({ data, selected, id }: NodeProps<{ id: string; type: 'wbText'
 						: <div className="empty">{_('(empty — double-click to edit)')}</div>
 				)}
 			</div>
-			{selected && !editing && node.text ? (
+			{selected && !editing && node.text && !ctx.readOnly ? (
 				<button
 					type="button"
 					onClick={onPromote}

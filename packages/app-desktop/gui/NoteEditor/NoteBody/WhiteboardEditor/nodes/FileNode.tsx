@@ -139,6 +139,7 @@ const FileNode = ({ data, selected }: NodeProps<{ id: string; type: 'wbFile'; da
 	const savingRef = useRef(false);
 	const onLinkedNoteBodyChange = useCallback(async (newBody: string) => {
 		if (!linkedNoteId) return;
+		if (ctx.readOnly) return;
 		if (linkedNoteDeletedTime) {
 			logger.info(`Ignoring checkbox toggle on deleted note: ${linkedNoteId}`);
 			return;
@@ -164,7 +165,7 @@ const FileNode = ({ data, selected }: NodeProps<{ id: string; type: 'wbFile'; da
 		} finally {
 			savingRef.current = false;
 		}
-	}, [linkedNoteId, linkedNoteUserUpdatedTime, linkedNoteDeletedTime, refetch]);
+	}, [linkedNoteId, linkedNoteUserUpdatedTime, linkedNoteDeletedTime, refetch, ctx.readOnly]);
 	const checkboxRef = useCheckboxToggle({
 		body: resolved?.kind === 'note' ? (resolved.body ?? '') : '',
 		onChange: onLinkedNoteBodyChange,
@@ -214,7 +215,7 @@ const FileNode = ({ data, selected }: NodeProps<{ id: string; type: 'wbFile'; da
 
 	return (
 		<>
-			<NodeResizer minWidth={80} minHeight={40} isVisible={!!selected} />
+			<NodeResizer minWidth={80} minHeight={40} isVisible={!!selected && !ctx.readOnly} />
 			{handlePositions.map(({ id: hid, position }) => (
 				<Handle key={hid} type="source" position={position} id={hid} />
 			))}

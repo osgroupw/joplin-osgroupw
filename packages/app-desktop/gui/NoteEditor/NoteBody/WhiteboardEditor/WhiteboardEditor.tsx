@@ -101,11 +101,12 @@ const WhiteboardEditor = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBody
 	}), [flushPendingSave]);
 
 	const onUpdateNode = useCallback((nodeId: string, patch: Record<string, unknown>) => {
+		if (props.disabled) return;
 		setCanvas(prev => ({
 			...prev,
 			nodes: prev.nodes.map(n => n.id === nodeId ? { ...n, ...patch } as CanvasNode : n),
 		}));
-	}, []);
+	}, [props.disabled]);
 
 	const onOpenRef = useCallback((value: string) => {
 		if (!value) return;
@@ -120,6 +121,7 @@ const WhiteboardEditor = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBody
 	// non-empty line as title; replace the text node with a file-ref node
 	// pointing at the new note.
 	const onPromoteTextNode = useCallback(async (canvasNodeId: string) => {
+		if (props.disabled) return;
 		const noteId = props.noteId;
 		if (!noteId) return;
 
@@ -158,7 +160,7 @@ const WhiteboardEditor = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBody
 			...curr,
 			nodes: curr.nodes.map(n => n.id === latest.id ? replacement : n),
 		}));
-	}, [props.noteId]);
+	}, [props.noteId, props.disabled]);
 
 	const themeAppearance = useMemo(() => themeStyle(props.themeId).appearance, [props.themeId]);
 
@@ -168,10 +170,11 @@ const WhiteboardEditor = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBody
 		resourceDirectory: props.resourceDirectory,
 		themeId: props.themeId,
 		themeAppearance,
+		readOnly: !!props.disabled,
 		onOpenRef,
 		onUpdateNode,
 		onPromoteTextNode,
-	}), [props.markupToHtml, props.resourceInfos, props.resourceDirectory, props.themeId, themeAppearance, onOpenRef, onUpdateNode, onPromoteTextNode]);
+	}), [props.markupToHtml, props.resourceInfos, props.resourceDirectory, props.themeId, themeAppearance, props.disabled, onOpenRef, onUpdateNode, onPromoteTextNode]);
 
 	if (parseError) {
 		return (
@@ -193,6 +196,7 @@ const WhiteboardEditor = (props: NoteBodyEditorProps, ref: ForwardedRef<NoteBody
 				<WhiteboardSurface
 					canvas={canvas}
 					onChange={setCanvas}
+					readOnly={!!props.disabled}
 				/>
 			</WhiteboardContext.Provider>
 		</div>

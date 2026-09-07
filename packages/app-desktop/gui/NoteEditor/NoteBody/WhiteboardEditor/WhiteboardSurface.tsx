@@ -54,6 +54,7 @@ const arrowModeFor = (e: WhiteboardFlowEdge): Exclude<ArrowMode, 'mixed'> => {
 interface Props {
 	canvas: Canvas;
 	onChange: (canvas: Canvas)=> void;
+	readOnly: boolean;
 }
 
 const nodeTypes: NodeTypes = {
@@ -63,7 +64,7 @@ const nodeTypes: NodeTypes = {
 	wbGroup: GroupNode as unknown as NodeTypes[string],
 };
 
-const InnerSurface = ({ canvas, onChange }: Props) => {
+const InnerSurface = ({ canvas, onChange, readOnly }: Props) => {
 	const ctx = useWhiteboardContext();
 	const initial = useMemo(() => canvasToFlow(canvas), [canvas]);
 	const [flowNodes, setFlowNodes] = useState<WhiteboardFlowNode[]>(initial.nodes);
@@ -91,12 +92,18 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 	}, [flowNodes, flowEdges, onChange]);
 
 	const onNodesChange: OnNodesChange = useCallback((changes) => {
-		setFlowNodes(prev => applyNodeChanges(changes, prev) as WhiteboardFlowNode[]);
-	}, []);
+		// Selection is harmless to allow read-only; everything else (drag,
+		// resize, delete) mutates the note and must be blocked.
+		const allowed = readOnly ? changes.filter(c => c.type === 'select') : changes;
+		if (!allowed.length) return;
+		setFlowNodes(prev => applyNodeChanges(allowed, prev) as WhiteboardFlowNode[]);
+	}, [readOnly]);
 
 	const onEdgesChange: OnEdgesChange = useCallback((changes) => {
-		setFlowEdges(prev => applyEdgeChanges(changes, prev) as WhiteboardFlowEdge[]);
-	}, []);
+		const allowed = readOnly ? changes.filter(c => c.type === 'select') : changes;
+		if (!allowed.length) return;
+		setFlowEdges(prev => applyEdgeChanges(allowed, prev) as WhiteboardFlowEdge[]);
+	}, [readOnly]);
 
 	// Drag-along for groups: when the user drags a group, all non-selected
 	// nodes whose centre lies inside the group's starting bounds move with it.
@@ -152,6 +159,7 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 	}, []);
 
 	const onConnect: OnConnect = useCallback((connection: Connection) => {
+		if (readOnly) return;
 		const edge: WhiteboardFlowEdge = {
 			id: generateId(),
 			source: connection.source,
@@ -168,9 +176,10 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 			},
 		};
 		setFlowEdges(prev => [...prev, edge]);
-	}, []);
+	}, [readOnly]);
 
 	const onReconnect: OnReconnect = useCallback((oldEdge, newConnection) => {
+		if (readOnly) return;
 		// `oldEdge` is the rendered edge, which carries the derived `style.stroke`
 		// (blue when selected) baked in by `renderedEdges`. reconnectEdge copies
 		// those fields onto the new edge, so it would persist that stroke into
@@ -180,7 +189,7 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 			const clean = prev.find(e => e.id === oldEdge.id);
 			return reconnectEdge((clean ?? oldEdge) as unknown as WhiteboardFlowEdge, newConnection, prev) as WhiteboardFlowEdge[];
 		});
-	}, []);
+	}, [readOnly]);
 
 	// Double-clicking an edge selects it exclusively and focuses the label
 	// input, so a user can start typing without moving the mouse to the panel.
@@ -368,6 +377,7 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 	);
 
 	const onDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+		if (readOnly) return;
 		const types = Array.from(e.dataTransfer.types);
 		if (types.includes('text/x-jop-note-ids') || types.includes('text/x-jop-resource-ids')) {
 			e.preventDefault();
@@ -376,9 +386,10 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 			e.preventDefault();
 			e.dataTransfer.dropEffect = 'copy';
 		}
-	}, []);
+	}, [readOnly]);
 
 	const onDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
+		if (readOnly) return;
 		const noteIdsRaw = e.dataTransfer.getData('text/x-jop-note-ids');
 		const resourceIdsRaw = e.dataTransfer.getData('text/x-jop-resource-ids');
 		// Electron's recommended way to get the on-disk path of a dropped File
@@ -428,7 +439,7 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 				}
 			}));
 		}
-	}, [rf, addCanvasNode]);
+	}, [rf, addCanvasNode, readOnly]);
 
 	return (
 		<div
@@ -448,12 +459,14 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 				onConnect={onConnect}
 				onReconnect={onReconnect}
 				onEdgeDoubleClick={onEdgeDoubleClick}
-				edgesReconnectable
+				edgesReconnectable={!readOnly}
+				nodesDraggable={!readOnly}
+				nodesConnectable={!readOnly}
 				onNodeDragStart={onNodeDragStart}
 				onNodeDrag={onNodeDrag}
 				onNodeDragStop={onNodeDragStop}
 				elevateEdgesOnSelect
-				deleteKeyCode={['Backspace', 'Delete']}
+				deleteKeyCode={readOnly ? [] : ['Backspace', 'Delete']}
 				multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
 				selectionKeyCode={['Shift']}
 				panOnScroll
@@ -468,12 +481,14 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 				<Controls showInteractive={false} />
 				<MiniMap pannable zoomable />
 
-				<ActionPanel position="top-right">
-					<ActionButton onClick={onAddText} title={_('Add a text card')}>{_('+ Text')}</ActionButton>
-					<ActionButton onClick={onAddGroup} title={_('Add a group')}>{_('+ Group')}</ActionButton>
-				</ActionPanel>
+				{!readOnly ? (
+					<ActionPanel position="top-right">
+						<ActionButton onClick={onAddText} title={_('Add a text card')}>{_('+ Text')}</ActionButton>
+						<ActionButton onClick={onAddGroup} title={_('Add a group')}>{_('+ Group')}</ActionButton>
+					</ActionPanel>
+				) : null}
 
-				{selectedEdges.length > 0 ? (
+				{!readOnly && selectedEdges.length > 0 ? (
 					<ActionPanel
 						position="bottom-center"
 						caption={_n('%d connection', '%d connections', selectedEdges.length, selectedEdges.length)}
@@ -500,7 +515,7 @@ const InnerSurface = ({ canvas, onChange }: Props) => {
 					</ActionPanel>
 				) : null}
 
-				{selectedNodes.length > 0 && selectedEdges.length === 0 ? (
+				{!readOnly && selectedNodes.length > 0 && selectedEdges.length === 0 ? (
 					<ActionPanel
 						position="bottom-center"
 						caption={_n('%d card', '%d cards', selectedNodes.length, selectedNodes.length)}

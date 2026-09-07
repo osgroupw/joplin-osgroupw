@@ -11,6 +11,7 @@ export interface WhiteboardContextValue {
 	resourceDirectory: string;
 	themeId: number;
 	themeAppearance: ThemeAppearance;
+	readOnly: boolean;
 	onOpenRef: (ref: string)=> void;
 	onUpdateNode: (canvasNodeId: string, patch: Record<string, unknown>)=> void;
 	onPromoteTextNode: (canvasNodeId: string)=> void;
